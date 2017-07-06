@@ -39,7 +39,6 @@ public:
 
 protected:
    ros::NodeHandle node;
-   //actionlib::SimpleActionServer<segmentation::imageRoiAction> server;
 private:
    ros::Subscriber segment_sub;
    ros::Subscriber depth_sub;

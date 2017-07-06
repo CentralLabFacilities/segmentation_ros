@@ -17,11 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
     actionlib
     object_recognition_msgs
     grasping_msgs
-    planning_scene_manager_msgs
-    message_generation)
-
-add_action_files(DIRECTORY action FILES imageRoi.action)
-generate_messages(DEPENDENCIES actionlib_msgs std_msgs sensor_msgs)
+    planning_scene_manager_msgs)
 
 
 #============================ c++11 =================================
