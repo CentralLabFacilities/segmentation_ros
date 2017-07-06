@@ -13,22 +13,27 @@
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <segmentation_msgs/segcla.h>
 
 using namespace std;
 using namespace log4cxx;
 
 const LoggerPtr Communicator::logger = Logger::getLogger("segmentation.communicator");
 
-Communicator::Communicator(const Segmentation& segmentation): seg(segmentation), server(node, "segment", boost::bind(&Communicator::segment_cb, this, _1), false) {
+//Communicator::Communicator(const Segmentation& segmentation): seg(segmentation), server(node, "segment", boost::bind(&Communicator::segment_cb, this, _1), false){
+Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) {
 
-    server.start();
-    segment_sub = node.subscribe("segment", 10, &Communicator::segment_cb, this);
+    //segment_sub = node.subscribe("segment", 10, &Communicator::segment_cb, this);
     LOG4CXX_DEBUG(logger, "subscribed to Topic segment\n");
 
-    image_pub = node.advertise<cv_bridge::CvImage>(topic_pub_image, 10);
-    cloud_pub = node.advertise<pcl::PointCloud<pcl::PointXYZRGBA>>(topic_pub_cloud, 10);
-    bbox_pub = node.advertise<sensor_msgs::RegionOfInterest>(topic_pub_bbox, 10);
-    LOG4CXX_DEBUG(logger, "created ROS topics " << topic_pub_image << ", " << topic_pub_cloud << ", " << topic_pub_bbox << "\n");
+    planning_service = node.advertiseService("getSegments", &Communicator::getSegments, this);
+    segment_service = node.advertiseService("segment", &Communicator::segment_cb, this);
+
+
+    class_client = node.serviceClient<segmentation_msgs::segcla>("classify");
+
+    //object_pub = node.advertise<grasping_msgs::GraspObjects>(topic_pub_objects, 10);
+    LOG4CXX_DEBUG(logger, "created ROS topic " << topic_pub_objects << "\n");
 }
 
 bool Communicator::is_published(string req_topic) {
@@ -71,8 +76,7 @@ void Communicator::rgb_cb(const sensor_msgs::ImageConstPtr& rgb) {
     got_img = true;
 }
 
-void Communicator::segment_cb(const segmentation::imageRoiGoalConstPtr& goal)
-//void Communicator::segment_cb(const std_msgs::String::ConstPtr &msg)
+bool Communicator::segment_cb(segmentation_msgs::segment::Request &req, segmentation_msgs::segment::Response &res)
 {
     LOG4CXX_DEBUG(logger, "got segmentation request.\n");
     bool d = is_published(topic_d);
@@ -80,13 +84,6 @@ void Communicator::segment_cb(const segmentation::imageRoiGoalConstPtr& goal)
     if (!d || !rgb) {
         LOG4CXX_WARN(logger, "neither " << topic_d << ", nor " << topic_rgb << " are available!\n");
     }
-    /**
-    tf::StampedTransform transform;
-    Eigen::Affine3d eig;
-    tfListener.lookupTransform("/base_link", "/xtion_link",ros::Time(0),transform);
-    tf::transformTFToEigen(transform, eig);
-    seg.setStaticTransform(eig.cast<float>());
-    */
 
     got_img = false;
     got_cloud = false;
@@ -119,29 +116,62 @@ void Communicator::segment_cb(const segmentation::imageRoiGoalConstPtr& goal)
     seg.setCloud(cloud_);
     seg.setImage(image_);
     seg.segment(image, candidates, tables);
-    publishResults(image, candidates, tables);
-    segmentation::imageRoiResult rois = publishRoi(candidates, image);
-    server.setSucceeded(rois);
-    LOG4CXX_DEBUG(logger, "Results were published.\n");
+    segmentation_msgs::segcla rois;
+    rois.request.objects = publishRoi(candidates, image);
 
+    if(class_client.call(rois)){
+        std::vector<std::string> labels = rois.response.labels;
+        res.labels = labels;
+        for (int i = 0; i < labels.size(); i++) {
+            grasping_msgs::Object object;
+            object.name = labels[i];
+            object.support_surface = "plane_0";
+            sensor_msgs::PointCloud2 cloud;
+            pcl::toROSMsg(*(candidates[i]->getObjectCloud()), cloud);
+            object.point_cluster = cloud;
+
+            objects.push_back(object);
+        }
+
+        for (int i = 0; i < tables.size(); i++){
+            grasping_msgs::Object plane;
+            plane.name = "plane_0";
+
+            support_planes.push_back(plane);
+        }
+
+        LOG4CXX_DEBUG(logger, "Results were published.\n");
+    } else {
+        ROS_ERROR("Failed to call service classify");
+        LOG4CXX_ERROR(logger, "Failed to call service classify.\n");
+    }
+
+    return true;
+}
+
+bool Communicator::getSegments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res) {
+    res.objects = objects;
+    res.support_surfaces = support_planes;
+    res.config = configs;
+    return true;
 }
 
 void Communicator::publishResults(ImageSource::Ptr& image, vector<ImageRegion::Ptr>& candidates, vector<Surface>& tables) {
     LOG4CXX_DEBUG(logger, "publish results.\n");
     publishClouds(image);
-    publishSupportPlanes(tables);
+    //publishSupportPlanes(tables);
 }
 
-segmentation::imageRoiResult Communicator::publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image){
+vector<sensor_msgs::Image> Communicator::publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image){
     LOG4CXX_DEBUG(logger, "publish Regions of interest.\n");
-    segmentation::imageRoiResult rois;
+    vector<sensor_msgs::Image> rois;
     for (vector<ImageRegion::Ptr>::const_iterator it = candidates.begin(); it != candidates.end(); ++it) {
         ImageRegion::Ptr item = *it;
         Roi region = item->getRoiColor();
         cv::Rect roi(region.X(), region.Y(), region.Width(), region.Height());
         cv::Mat imageROI = image_(roi);
         sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", imageROI).toImageMsg();
-        rois.rois.push_back(*msg);
+        rois.push_back(*msg);
     }
     return rois;
 
@@ -149,10 +179,10 @@ segmentation::imageRoiResult Communicator::publishRoi(vector<ImageRegion::Ptr>& 
 
 void Communicator::publishClouds(ImageSource::Ptr& image) {
     LOG4CXX_DEBUG(logger, "publish cloud.\n");
-    cloud_pub.publish(image->getCloudScene());
+    //cloud_pub.publish(image->getCloudScene());
 
 }
-
+/**
 void Communicator::publishSupportPlanes(vector<Surface>& tables){
     LOG4CXX_DEBUG(logger, "publish Planes.\n");
 
@@ -169,10 +199,29 @@ void Communicator::publishSupportPlanes(vector<Surface>& tables){
         invTransl.fromPositionOrientationScale(translationInv, Eigen::AngleAxisf::Identity(), Eigen::Vector3f::Ones());
         LOG4CXX_INFO(logger, "inverse translation: " << invTransl.matrix() << "\n");
 
+        segmentation::PolygonialPath3D patch;
+        patch.base.position.x(translation[0]);
+        patch.base.position.y(translation[1]);
+        patch.base.position.z(translation[2]);
+        patch.base.position.frame_id("base_link");
+        patch.base.rotation.x(0);
+        patch.base.rotation.y(0);
+        patch.base.rotation.z(0);
+        patch.base.rotation.w(1);
+
+        for (int i = 0; i < hull->points.size(); i++){
+            pcl::PointCloud<pcl::PointXYZ>::PointType p = hull->points[i];
+            geometry_msgs::Point border;
+            border.x(p.x);
+            border.y(p.y);
+            patch.border.push_back(border);
+            LOG4CXX_INFO(logger, string("patch border: ") << p.x << "," << p.y << "(,"<< p.z<<")");
+        }
+        plane_pub.publish(patch);
     }
 
 }
-
+*/
 
 
 

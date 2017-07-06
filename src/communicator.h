@@ -17,8 +17,12 @@
 #include <opencv2/opencv.hpp>
 #include "segmentation.h"
 #include <tf/transform_listener.h>
-#include <segmentation/imageRoiAction.h>
 #include <actionlib/server/simple_action_server.h>
+#include <actionlib/server/simple_action_server.h>
+#include <planning_scene_manager_msgs/Segmentation.h>
+#include <planning_scene_manager_msgs/FittingConfig.h>
+#include <segmentation_msgs/segment.h>
+#include <grasping_msgs/Object.h>
 
 class Communicator {
 public:
@@ -26,33 +30,33 @@ public:
     bool is_published(string req_topic);
     void depth_cb(const sensor_msgs::PointCloud2ConstPtr& cloud);
     void rgb_cb(const sensor_msgs::ImageConstPtr& rgb);
-    void segment_cb(const segmentation::imageRoiGoalConstPtr& goal);
+    bool segment_cb(segmentation_msgs::segment::Request &req, segmentation_msgs::segment::Response &res);
     void publishResults(ImageSource::Ptr& image, vector<ImageRegion::Ptr>& candidates, vector<Surface>& tables);
-    segmentation::imageRoiResult publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
+    vector<sensor_msgs::Image> publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
     void publishClouds(ImageSource::Ptr& image);
-    void publishSupportPlanes(vector<Surface>& tables);
+    bool getSegments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
+    //void publishSupportPlanes(vector<Surface>& tables);
 
 protected:
    ros::NodeHandle node;
-    actionlib::SimpleActionServer<segmentation::imageRoiAction> server;
+   //actionlib::SimpleActionServer<segmentation::imageRoiAction> server;
 private:
    ros::Subscriber segment_sub;
    ros::Subscriber depth_sub;
    ros::Subscriber rgb_sub;
 
-   ros::Publisher image_pub;
-   ros::Publisher cloud_pub;
-   ros::Publisher bbox_pub;
-   ros::Publisher plane_pub;
+   ros::Publisher object_pub;
+
+   ros::ServiceClient class_client;
+   ros::ServiceServer segment_service;
+   ros::ServiceServer planning_service;
 
 
    tf::TransformListener tfListener;
 
    const string topic_d = "/xtion/depth/points";
    const string topic_rgb = "/xtion/rgb/image_raw";
-   const string topic_pub_image = "/image";
-   const string topic_pub_cloud = "/cloud";
-   const string topic_pub_bbox = "/boundingBox";
+   const string topic_pub_objects = "/classObjects";
 
    const uint TIMEOUT = 120;
 
@@ -60,6 +64,10 @@ private:
    bool got_cloud;
 
    Segmentation seg;
+   vector<grasping_msgs::Object> objects;
+   vector<grasping_msgs::Object> support_planes;
+   planning_scene_manager_msgs::FittingConfig config;
+   vector<planning_scene_manager_msgs::FittingConfig> configs;
 
    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_;
    cv::Mat image_;
