@@ -68,8 +68,7 @@ private:
    Segmentation seg;
    vector<grasping_msgs::Object> objects;
    vector<grasping_msgs::Object> support_planes;
-   planning_scene_manager_msgs::FittingConfig config;
-   vector<planning_scene_manager_msgs::FittingConfig> configs;
+    vector<string> config_names;
 
    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_;
    cv::Mat image_;

@@ -136,6 +136,9 @@ bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request 
 
             objects.push_back(object);
 
+            // allow all shapes until we add knowledge db
+            config_names.push_back(planning_scene_manager_msgs::SegmentationResponse::CONFIG_ALL);
+
             // assemble objectlocation for response
             object_recognition_msgs::ObjectLocation object_location;
 
@@ -167,7 +170,7 @@ bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request 
 bool Communicator::get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res) {
     res.objects = objects;
     res.support_surfaces = support_planes;
-    res.config = configs;
+    res.config_names = config_names;
     return true;
 }
 
