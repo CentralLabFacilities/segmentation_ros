@@ -21,7 +21,8 @@
 #include <actionlib/server/simple_action_server.h>
 #include <planning_scene_manager_msgs/Segmentation.h>
 #include <planning_scene_manager_msgs/FittingConfig.h>
-#include <object_recognition_msgs/segment.h>
+#include <object_recognition_msgs/Classify.h>
+#include <object_recognition_msgs/RecognizeObjects.h>
 #include <grasping_msgs/Object.h>
 
 class Communicator {
@@ -30,11 +31,11 @@ public:
     bool is_published(string req_topic);
     void depth_cb(const sensor_msgs::PointCloud2ConstPtr& cloud);
     void rgb_cb(const sensor_msgs::ImageConstPtr& rgb);
-    bool segment_cb(object_recognition_msgs::segment::Request &req, object_recognition_msgs::segment::Response &res);
+    bool recognize(object_recognition_msgs::RecognizeObjects::Request &req, object_recognition_msgs::RecognizeObjects::Response &res);
     void publishResults(ImageSource::Ptr& image, vector<ImageRegion::Ptr>& candidates, vector<Surface>& tables);
     vector<sensor_msgs::Image> publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
     void publishClouds(ImageSource::Ptr& image);
-    bool getSegments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
+    bool get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
     //void publishSupportPlanes(vector<Surface>& tables);
 
 protected:
@@ -46,9 +47,9 @@ private:
 
    ros::Publisher object_pub;
 
-   ros::ServiceClient class_client;
+   ros::ServiceClient classify_client;
    ros::ServiceServer segment_service;
-   ros::ServiceServer planning_service;
+   ros::ServiceServer recognize_service;
 
 
    tf::TransformListener tfListener;
@@ -61,6 +62,8 @@ private:
 
    bool got_img;
    bool got_cloud;
+
+    int num_objects;
 
    Segmentation seg;
    vector<grasping_msgs::Object> objects;

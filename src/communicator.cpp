@@ -13,7 +13,6 @@
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <object_recognition_msgs/segcla.h>
 
 using namespace std;
 using namespace log4cxx;
@@ -26,14 +25,16 @@ Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) 
     //segment_sub = node.subscribe("segment", 10, &Communicator::segment_cb, this);
     LOG4CXX_DEBUG(logger, "subscribed to Topic segment\n");
 
-    planning_service = node.advertiseService("getSegments", &Communicator::getSegments, this);
-    segment_service = node.advertiseService("segment", &Communicator::segment_cb, this);
+    segment_service = node.advertiseService("segmentation", &Communicator::get_segments, this);
+    recognize_service = node.advertiseService("recognize_objects", &Communicator::recognize, this);
 
 
-    class_client = node.serviceClient<object_recognition_msgs::segcla>("classify");
+    classify_client = node.serviceClient<object_recognition_msgs::Classify>("classify");
 
     //object_pub = node.advertise<grasping_msgs::GraspObjects>(topic_pub_objects, 10);
     LOG4CXX_DEBUG(logger, "created ROS topic " << topic_pub_objects << "\n");
+
+    num_objects = 0;
 }
 
 bool Communicator::is_published(string req_topic) {
@@ -76,7 +77,7 @@ void Communicator::rgb_cb(const sensor_msgs::ImageConstPtr& rgb) {
     got_img = true;
 }
 
-bool Communicator::segment_cb(object_recognition_msgs::segment::Request &req, object_recognition_msgs::segment::Response &res)
+bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request &req, object_recognition_msgs::RecognizeObjects::Response &res)
 {
     LOG4CXX_DEBUG(logger, "got segmentation request.\n");
     bool d = is_published(topic_d);
@@ -116,21 +117,35 @@ bool Communicator::segment_cb(object_recognition_msgs::segment::Request &req, ob
     seg.setCloud(cloud_);
     seg.setImage(image_);
     seg.segment(image, candidates, tables);
-    object_recognition_msgs::segcla rois;
-    rois.request.objects = publishRoi(candidates, image);
+    object_recognition_msgs::Classify classify;
+    classify.request.objects = publishRoi(candidates, image);
 
-    if(class_client.call(rois)){
-        std::vector<std::string> labels = rois.response.labels;
-        res.labels = labels;
-        for (int i = 0; i < labels.size(); i++) {
+    if(classify_client.call(classify)){
+
+        // process classification results
+        for (int i = 0; i < classify.response.hypotheses.size(); i++) {
+
+            // assemble objects containing pointclouds and UUID's for fitting
             grasping_msgs::Object object;
-            object.name = labels[i];
+
+            object.name = to_string(num_objects);
             object.support_surface = "plane_0";
             sensor_msgs::PointCloud2 cloud;
             pcl::toROSMsg(*(candidates[i]->getObjectCloud()), cloud);
             object.point_cluster = cloud;
 
             objects.push_back(object);
+
+            // assemble objectlocation for response
+            object_recognition_msgs::ObjectLocation object_location;
+
+            object_location.name = to_string(num_objects);
+            object_location.hypothesis = classify.response.hypotheses[i];
+
+            res.objects_2d.push_back(object_location);
+
+            // increment objet name good 'ol clafu style
+            ++num_objects;
         }
 
         for (int i = 0; i < tables.size(); i++){
@@ -149,7 +164,7 @@ bool Communicator::segment_cb(object_recognition_msgs::segment::Request &req, ob
     return true;
 }
 
-bool Communicator::getSegments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res) {
+bool Communicator::get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res) {
     res.objects = objects;
     res.support_surfaces = support_planes;
     res.config = configs;
