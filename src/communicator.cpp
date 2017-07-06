@@ -13,7 +13,7 @@
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <segmentation_msgs/segcla.h>
+#include <object_recognition_msgs/segcla.h>
 
 using namespace std;
 using namespace log4cxx;
@@ -30,7 +30,7 @@ Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) 
     segment_service = node.advertiseService("segment", &Communicator::segment_cb, this);
 
 
-    class_client = node.serviceClient<segmentation_msgs::segcla>("classify");
+    class_client = node.serviceClient<object_recognition_msgs::segcla>("classify");
 
     //object_pub = node.advertise<grasping_msgs::GraspObjects>(topic_pub_objects, 10);
     LOG4CXX_DEBUG(logger, "created ROS topic " << topic_pub_objects << "\n");
@@ -76,7 +76,7 @@ void Communicator::rgb_cb(const sensor_msgs::ImageConstPtr& rgb) {
     got_img = true;
 }
 
-bool Communicator::segment_cb(segmentation_msgs::segment::Request &req, segmentation_msgs::segment::Response &res)
+bool Communicator::segment_cb(object_recognition_msgs::segment::Request &req, object_recognition_msgs::segment::Response &res)
 {
     LOG4CXX_DEBUG(logger, "got segmentation request.\n");
     bool d = is_published(topic_d);
@@ -116,7 +116,7 @@ bool Communicator::segment_cb(segmentation_msgs::segment::Request &req, segmenta
     seg.setCloud(cloud_);
     seg.setImage(image_);
     seg.segment(image, candidates, tables);
-    segmentation_msgs::segcla rois;
+    object_recognition_msgs::segcla rois;
     rois.request.objects = publishRoi(candidates, image);
 
     if(class_client.call(rois)){

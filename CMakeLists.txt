@@ -15,7 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
     roslib
     actionlib_msgs
     actionlib
-    segmentation_msgs
+    object_recognition_msgs
     grasping_msgs
     planning_scene_manager_msgs
     message_generation)
