@@ -120,6 +120,9 @@ bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request 
     object_recognition_msgs::Classify classify;
     classify.request.objects = publishRoi(candidates, image);
 
+    // clean old object segments
+    clear_segments();
+
     if(classify_client.call(classify)){
 
         // process classification results
@@ -200,6 +203,14 @@ void Communicator::publishClouds(ImageSource::Ptr& image) {
     //cloud_pub.publish(image->getCloudScene());
 
 }
+
+
+void Communicator::clear_segments() {
+    objects.clear();
+    support_planes.clear();
+    config_names.clear();
+}
+
 /**
 void Communicator::publishSupportPlanes(vector<Surface>& tables){
     LOG4CXX_DEBUG(logger, "publish Planes.\n");

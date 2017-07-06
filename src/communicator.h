@@ -36,6 +36,7 @@ public:
     vector<sensor_msgs::Image> publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
     void publishClouds(ImageSource::Ptr& image);
     bool get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
+    void clear_segments();
     //void publishSupportPlanes(vector<Surface>& tables);
 
 protected:
