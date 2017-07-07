@@ -13,25 +13,29 @@
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <sstream>
+#include <limits>
+#include <boost/algorithm/string.hpp>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <geometric_shapes/mesh_operations.h>
+#include <geometric_shapes/shape_messages.h>
+#include <geometric_shapes/shape_operations.h>
 
 using namespace std;
 using namespace log4cxx;
 
 const LoggerPtr Communicator::logger = Logger::getLogger("segmentation.communicator");
 
-//Communicator::Communicator(const Segmentation& segmentation): seg(segmentation), server(node, "segment", boost::bind(&Communicator::segment_cb, this, _1), false){
 Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) {
 
-    //segment_sub = node.subscribe("segment", 10, &Communicator::segment_cb, this);
-    LOG4CXX_DEBUG(logger, "subscribed to Topic segment\n");
 
     segment_service = node.advertiseService("segmentation", &Communicator::get_segments, this);
     recognize_service = node.advertiseService("recognize_objects", &Communicator::recognize, this);
+    LOG4CXX_DEBUG(logger, "startet service Server segmentation, recognize_objects\n");
 
 
     classify_client = node.serviceClient<object_tracking_msgs::Classify>("classify");
 
-    //object_pub = node.advertise<grasping_msgs::GraspObjects>(topic_pub_objects, 10);
     LOG4CXX_DEBUG(logger, "created ROS topic " << topic_pub_objects << "\n");
 
     num_objects = 0;
@@ -150,7 +154,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
 
             res.objects_2d.push_back(object_location);
 
-            // increment objet name good 'ol clafu style
+            // increment object name good 'ol clafu style
             ++num_objects;
         }
 
@@ -177,12 +181,6 @@ bool Communicator::get_segments(planning_scene_manager_msgs::Segmentation::Reque
     return true;
 }
 
-void Communicator::publishResults(ImageSource::Ptr& image, vector<ImageRegion::Ptr>& candidates, vector<Surface>& tables) {
-    LOG4CXX_DEBUG(logger, "publish results.\n");
-    publishClouds(image);
-    //publishSupportPlanes(tables);
-}
-
 vector<sensor_msgs::Image> Communicator::publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image){
     LOG4CXX_DEBUG(logger, "publish Regions of interest.\n");
     vector<sensor_msgs::Image> rois;
@@ -198,12 +196,6 @@ vector<sensor_msgs::Image> Communicator::publishRoi(vector<ImageRegion::Ptr>& ca
 
 }
 
-void Communicator::publishClouds(ImageSource::Ptr& image) {
-    LOG4CXX_DEBUG(logger, "publish cloud.\n");
-    //cloud_pub.publish(image->getCloudScene());
-
-}
-
 
 void Communicator::clear_segments() {
     objects.clear();
@@ -211,14 +203,30 @@ void Communicator::clear_segments() {
     config_names.clear();
 }
 
-/**
-void Communicator::publishSupportPlanes(vector<Surface>& tables){
-    LOG4CXX_DEBUG(logger, "publish Planes.\n");
+
+void Communicator::calcSupportPlanes(vector<Surface>& tables){
+    LOG4CXX_DEBUG(logger, "calc support Planes.\n");
+
+    vector<grasping_msgs::Object> surfaces;
+
+    grasping_msgs::Object surfaceBig;
+    geometry_msgs::PoseStamped poseBig;
+    shape_msgs::SolidPrimitive primitiveBig;
+
+    double yBig, xBig, zBig, yMaxB, yMinB;
+    yBig = xBig = zBig = yMaxB = yMinB = 0;
 
     vector<Surface>::const_iterator it;
     for (it = tables.begin(); it != tables.end(); ++it) {
-        Surface item = *it;
+        stringstream ss;
+        ss << "surface" << (it - tables.begin());
+        string name = ss.str();
 
+        Surface item = *it;
+        double xMax, yMax;
+        xMax = yMax = -numeric_limits<double>::max();
+        double xMin, yMin;
+        xMin = yMin = numeric_limits<double>::max();
         pcl::PointCloud<pcl::PointXYZ>::Ptr hull = item.cloudHull;
         pcl::PointNormal normal = item.cloudNormal;
         Eigen::Affine3f pose = item.getPlanePose(Eigen::Vector3f(0,0,1));
@@ -228,29 +236,111 @@ void Communicator::publishSupportPlanes(vector<Surface>& tables){
         invTransl.fromPositionOrientationScale(translationInv, Eigen::AngleAxisf::Identity(), Eigen::Vector3f::Ones());
         LOG4CXX_INFO(logger, "inverse translation: " << invTransl.matrix() << "\n");
 
-        segmentation::PolygonialPath3D patch;
-        patch.base.position.x(translation[0]);
-        patch.base.position.y(translation[1]);
-        patch.base.position.z(translation[2]);
-        patch.base.position.frame_id("base_link");
-        patch.base.rotation.x(0);
-        patch.base.rotation.y(0);
-        patch.base.rotation.z(0);
-        patch.base.rotation.w(1);
+        //gets the z Coordinate to detect the highest and lowest plane
+        double zCoord = translation[2];
 
+        int numBorder = patch.border_size();
         for (int i = 0; i < hull->points.size(); i++){
-            pcl::PointCloud<pcl::PointXYZ>::PointType p = hull->points[i];
-            geometry_msgs::Point border;
-            border.x(p.x);
-            border.y(p.y);
-            patch.border.push_back(border);
-            LOG4CXX_INFO(logger, string("patch border: ") << p.x << "," << p.y << "(,"<< p.z<<")");
+            pcl::PointCloud<pcl::PointXYZ>::PointType border = hull->points[i];
+            if (xMax < border.x()) {
+                xMax = border.x();
+            }
+            if (yMax < border.y()) {
+                yMax = border.y();
+            }
+            if (xMin > border.x()) {
+                xMin = border.x();
+            }
+            if (yMin > border.y()) {
+                yMin = border.y();
+            }
         }
-        plane_pub.publish(patch);
+
+        double xCenter = xMin + (xMax - xMin) / 2.0;
+        double yCenter = yMin + (yMax - yMin) / 2.0;
+
+        shape_msgs::SolidPrimitive primitive;
+        primitive.type = primitive.BOX;
+        primitive.dimensions.resize(3);
+        primitive.dimensions[0] = xMax - xMin;
+        primitive.dimensions[1] = yMax - yMin;
+        primitive.dimensions[2] = 0.01;
+        primitive.dimensions[1] = 1.3;
+
+        geometry_msgs::PoseStamped poseOld;
+        poseOld.pose.position.x = translation[0];
+        poseOld.pose.position.y = translation[1];
+        poseOld.pose.position.z = translation[2];
+        poseOld.pose.orientation.w = 1;
+        poseOld.pose.orientation.x = 0;
+        poseOld.pose.orientation.y = 0;
+        poseOld.pose.orientation.z = 0;
+        poseOld.header.frame_id = "base_link";
+
+        geometry_msgs::PoseStamped poseNew;
+        transformer.transform(poseOld, poseNew, "base_link");
+
+        grasping_msgs::Object surface;
+        surface.header.frame_id = poseNew.header.frame_id;
+        surface.id = ss.str();
+        surface.operation = surface.ADD;
+        surface.primitive_poses.push_back(poseNew.pose);
+        surface.primitives.push_back(primitive);
+
+        surfaces.push_back(surface);
+
+        //the important data for the biggest surface is stored.
+        if((abs(yMax - yMin)) > yBig){
+            yBig = abs(yMax - yMin);
+            xBig = abs(xMax - xMin);
+            zBig = zCoord;
+            yMaxB = yMax;
+            yMinB = yMin;
+            surfaceBig = surface;
+            primitiveBig = primitive;
+            poseBig = poseNew;
+        }
+
+        zBig = 3.00;
+
+        //primitive is reused and parameters for left plane are used
+        primitiveBig.dimensions[0] =  xBig; //length
+        primitiveBig.dimensions[1] =  0.01; //depth
+        primitiveBig.dimensions[2] =  zBig;//height
+
+        moveit_msgs::CollisionObject surfaceLeft;
+        surfaceLeft.header.frame_id = poseBig.header.frame_id;
+        surfaceLeft.id = "surfaceBigLeft";
+        surfaceLeft.operation = surfaceBig.ADD;
+        surfaceLeft.primitive_poses.push_back(poseBig.pose);
+        surfaceLeft.primitives.push_back(primitiveBig);
+        surfaceLeft.primitive_poses[0].position.x = surfaceBig.primitive_poses[0].position.x;
+        surfaceLeft.primitive_poses[0].position.y = yMinB;
+        surfaceLeft.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
+
+        surfaces.push_back(surfaceLeft);
+
+        //Transform of the right plane that is created; for comments look at leftplane
+        primitiveBig.dimensions[0] =  xBig; //length
+        primitiveBig.dimensions[1] =  0.01; //depth
+        primitiveBig.dimensions[2] =  zBig;//height
+
+        moveit_msgs::CollisionObject surfaceRight;
+        surfaceRight.header.frame_id = poseBig.header.frame_id;
+        surfaceRight.id = "surfaceBigRight";
+        surfaceRight.operation = surfaceBig.ADD;
+        surfaceRight.primitive_poses.push_back(poseBig.pose);
+        surfaceRight.primitives.push_back(primitiveBig);
+        surfaceRight.primitive_poses[0].position.x = surfaceBig.primitive_poses[0].position.x;
+        surfaceRight.primitive_poses[0].position.y = yMaxB;
+        surfaceRight.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
+
+        surfaces.push_back(surfaceRight);
+
+        sceneInterface.addCollisionObjects(surfaces);
     }
 
 }
-*/
 
 
 

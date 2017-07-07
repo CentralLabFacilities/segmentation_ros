@@ -31,12 +31,9 @@ public:
     void depth_cb(const sensor_msgs::PointCloud2ConstPtr& cloud);
     void rgb_cb(const sensor_msgs::ImageConstPtr& rgb);
     bool recognize(object_tracking_msgs::RecognizeObjects::Request &req, object_tracking_msgs::RecognizeObjects::Response &res);
-    void publishResults(ImageSource::Ptr& image, vector<ImageRegion::Ptr>& candidates, vector<Surface>& tables);
     vector<sensor_msgs::Image> publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
-    void publishClouds(ImageSource::Ptr& image);
     bool get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
     void clear_segments();
-    //void publishSupportPlanes(vector<Surface>& tables);
 
 protected:
    ros::NodeHandle node;
@@ -68,7 +65,7 @@ private:
    Segmentation seg;
    vector<grasping_msgs::Object> objects;
    vector<grasping_msgs::Object> support_planes;
-    vector<string> config_names;
+   vector<string> config_names;
 
    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_;
    cv::Mat image_;
