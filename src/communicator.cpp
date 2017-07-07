@@ -206,7 +206,7 @@ void Communicator::clear_segments() {
 
 void Communicator::calcSupportPlanes(vector<Surface>& tables){
     LOG4CXX_DEBUG(logger, "calc support Planes.\n");
-
+    /*
     vector<grasping_msgs::Object> surfaces;
 
     grasping_msgs::Object surfaceBig;
@@ -242,17 +242,17 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         int numBorder = patch.border_size();
         for (int i = 0; i < hull->points.size(); i++){
             pcl::PointCloud<pcl::PointXYZ>::PointType border = hull->points[i];
-            if (xMax < border.x()) {
-                xMax = border.x();
+            if (xMax < border.x) {
+                xMax = border.x;
             }
-            if (yMax < border.y()) {
-                yMax = border.y();
+            if (yMax < border.y) {
+                yMax = border.y;
             }
-            if (xMin > border.x()) {
-                xMin = border.x();
+            if (xMin > border.x) {
+                xMin = border.x;
             }
-            if (yMin > border.y()) {
-                yMin = border.y();
+            if (yMin > border.y) {
+                yMin = border.y;
             }
         }
 
@@ -338,7 +338,7 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         surfaces.push_back(surfaceRight);
 
         sceneInterface.addCollisionObjects(surfaces);
-    }
+    }*/
 
 }
 
