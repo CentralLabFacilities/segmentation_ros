@@ -99,6 +99,10 @@ SET(SEG_SRC src/ImageRegion.cpp
 
 ADD_EXECUTABLE(segmentation src/communicator.cpp ${SEG_SRC})
 target_link_libraries(segmentation ${PCL_LIBRARIES} ${PCA_LIBRARIES} ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen3_LIBRARIES} ${OpenCV_LIBRARIES} ${ROS_LIBRARIES})
-INSTALL(TARGETS segmentation
-    DESTINATION bin)
+
+install(TARGETS segmentation
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+        )
 
