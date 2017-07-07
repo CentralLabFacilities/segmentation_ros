@@ -175,6 +175,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
 }
 
 bool Communicator::get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res) {
+    LOG4CXX_INFO(logger, "get_segments.\n");
     res.objects = objects;
     res.support_surfaces = support_planes;
     res.config_names = config_names;
