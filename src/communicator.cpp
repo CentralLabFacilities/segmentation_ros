@@ -121,6 +121,9 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
     seg.setCloud(cloud_);
     seg.setImage(image_);
     seg.segment(image, candidates, tables);
+
+    LOG4CXX_INFO(logger, "found " << candidates.size() << " objects and " << tables.size() << " planes!\n");
+
     object_tracking_msgs::Classify classify;
     classify.request.objects = publishRoi(candidates, image);
 
