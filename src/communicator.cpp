@@ -29,7 +29,7 @@ Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) 
     recognize_service = node.advertiseService("recognize_objects", &Communicator::recognize, this);
 
 
-    classify_client = node.serviceClient<object_recognition_msgs::Classify>("classify");
+    classify_client = node.serviceClient<object_tracking_msgs::Classify>("classify");
 
     //object_pub = node.advertise<grasping_msgs::GraspObjects>(topic_pub_objects, 10);
     LOG4CXX_DEBUG(logger, "created ROS topic " << topic_pub_objects << "\n");
@@ -77,7 +77,7 @@ void Communicator::rgb_cb(const sensor_msgs::ImageConstPtr& rgb) {
     got_img = true;
 }
 
-bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request &req, object_recognition_msgs::RecognizeObjects::Response &res)
+bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &req, object_tracking_msgs::RecognizeObjects::Response &res)
 {
     LOG4CXX_DEBUG(logger, "got segmentation request.\n");
     bool d = is_published(topic_d);
@@ -117,7 +117,7 @@ bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request 
     seg.setCloud(cloud_);
     seg.setImage(image_);
     seg.segment(image, candidates, tables);
-    object_recognition_msgs::Classify classify;
+    object_tracking_msgs::Classify classify;
     classify.request.objects = publishRoi(candidates, image);
 
     // clean old object segments
@@ -143,7 +143,7 @@ bool Communicator::recognize(object_recognition_msgs::RecognizeObjects::Request 
             config_names.push_back(planning_scene_manager_msgs::SegmentationResponse::CONFIG_ALL);
 
             // assemble objectlocation for response
-            object_recognition_msgs::ObjectLocation object_location;
+            object_tracking_msgs::ObjectLocation object_location;
 
             object_location.name = to_string(num_objects);
             object_location.hypothesis = classify.response.hypotheses[i];

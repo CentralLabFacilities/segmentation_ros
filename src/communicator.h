@@ -20,9 +20,8 @@
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/server/simple_action_server.h>
 #include <planning_scene_manager_msgs/Segmentation.h>
-#include <planning_scene_manager_msgs/FittingConfig.h>
-#include <object_recognition_msgs/Classify.h>
-#include <object_recognition_msgs/RecognizeObjects.h>
+#include <object_tracking_msgs/Classify.h>
+#include <object_tracking_msgs/RecognizeObjects.h>
 #include <grasping_msgs/Object.h>
 
 class Communicator {
@@ -31,7 +30,7 @@ public:
     bool is_published(string req_topic);
     void depth_cb(const sensor_msgs::PointCloud2ConstPtr& cloud);
     void rgb_cb(const sensor_msgs::ImageConstPtr& rgb);
-    bool recognize(object_recognition_msgs::RecognizeObjects::Request &req, object_recognition_msgs::RecognizeObjects::Response &res);
+    bool recognize(object_tracking_msgs::RecognizeObjects::Request &req, object_tracking_msgs::RecognizeObjects::Response &res);
     void publishResults(ImageSource::Ptr& image, vector<ImageRegion::Ptr>& candidates, vector<Surface>& tables);
     vector<sensor_msgs::Image> publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
     void publishClouds(ImageSource::Ptr& image);
