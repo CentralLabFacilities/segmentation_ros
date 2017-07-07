@@ -71,7 +71,7 @@ private:
    cv::Mat image_;
    static const log4cxx::LoggerPtr logger;
 
-    void calcSupportPlanes(vector<Surface>& tables);
+   void calcSupportPlanes(vector<Surface>& tables);
 
 };
 #endif

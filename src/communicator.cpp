@@ -210,8 +210,6 @@ void Communicator::clear_segments() {
 
 void Communicator::calcSupportPlanes(vector<Surface>& tables){
     LOG4CXX_DEBUG(logger, "calc support Planes.\n");
-    /*
-    vector<grasping_msgs::Object> surfaces;
 
     grasping_msgs::Object surfaceBig;
     geometry_msgs::PoseStamped poseBig;
@@ -242,8 +240,6 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
 
         //gets the z Coordinate to detect the highest and lowest plane
         double zCoord = translation[2];
-
-        int numBorder = patch.border_size();
         for (int i = 0; i < hull->points.size(); i++){
             pcl::PointCloud<pcl::PointXYZ>::PointType border = hull->points[i];
             if (xMax < border.x) {
@@ -271,28 +267,24 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         primitive.dimensions[2] = 0.01;
         primitive.dimensions[1] = 1.3;
 
-        geometry_msgs::PoseStamped poseOld;
-        poseOld.pose.position.x = translation[0];
-        poseOld.pose.position.y = translation[1];
-        poseOld.pose.position.z = translation[2];
-        poseOld.pose.orientation.w = 1;
-        poseOld.pose.orientation.x = 0;
-        poseOld.pose.orientation.y = 0;
-        poseOld.pose.orientation.z = 0;
-        poseOld.header.frame_id = "base_link";
-
-        geometry_msgs::PoseStamped poseNew;
-        transformer.transform(poseOld, poseNew, "base_link");
+        geometry_msgs::Pose poseNew;
+        poseNew.position.x = translation[0];
+        poseNew.position.y = translation[1];
+        poseNew.position.z = translation[2];
+        poseNew.orientation.w = 1;
+        poseNew.orientation.x = 0;
+        poseNew.orientation.y = 0;
+        poseNew.orientation.z = 0;
 
         grasping_msgs::Object surface;
-        surface.header.frame_id = poseNew.header.frame_id;
-        surface.id = ss.str();
-        surface.operation = surface.ADD;
-        surface.primitive_poses.push_back(poseNew.pose);
+        surface.header.frame_id = "base_link";
+        surface.name = ss.str();
+        surface.primitive_poses.push_back(poseNew);
         surface.primitives.push_back(primitive);
 
-        surfaces.push_back(surface);
+        support_planes.push_back(surface);
 
+        /**
         //the important data for the biggest surface is stored.
         if((abs(yMax - yMin)) > yBig){
             yBig = abs(yMax - yMin);
@@ -322,7 +314,7 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         surfaceLeft.primitive_poses[0].position.y = yMinB;
         surfaceLeft.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
 
-        surfaces.push_back(surfaceLeft);
+        support_planes.push_back(surfaceLeft);
 
         //Transform of the right plane that is created; for comments look at leftplane
         primitiveBig.dimensions[0] =  xBig; //length
@@ -339,10 +331,9 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         surfaceRight.primitive_poses[0].position.y = yMaxB;
         surfaceRight.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
 
-        surfaces.push_back(surfaceRight);
-
-        sceneInterface.addCollisionObjects(surfaces);
-    }*/
+        support_planes.push_back(surfaceRight);
+         */
+    }
 
 }
 
