@@ -97,8 +97,8 @@ SET(SEG_SRC src/ImageRegion.cpp
             src/segmentation.cpp
             src/Surface.cpp)
 
-ADD_EXECUTABLE(Segmentation src/communicator.cpp ${SEG_SRC})
-target_link_libraries(Segmentation ${PCL_LIBRARIES} ${PCA_LIBRARIES} ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen3_LIBRARIES} ${OpenCV_LIBRARIES} ${ROS_LIBRARIES})
-INSTALL(TARGETS Segmentation
+ADD_EXECUTABLE(segmentation src/communicator.cpp ${SEG_SRC})
+target_link_libraries(segmentation ${PCL_LIBRARIES} ${PCA_LIBRARIES} ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen3_LIBRARIES} ${OpenCV_LIBRARIES} ${ROS_LIBRARIES})
+INSTALL(TARGETS segmentation
     DESTINATION bin)
 
