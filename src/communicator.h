@@ -31,7 +31,7 @@ public:
     void depth_cb(const sensor_msgs::PointCloud2ConstPtr& cloud);
     void rgb_cb(const sensor_msgs::ImageConstPtr& rgb);
     bool recognize(object_tracking_msgs::RecognizeObjects::Request &req, object_tracking_msgs::RecognizeObjects::Response &res);
-    vector<sensor_msgs::Image> publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
+    vector<sensor_msgs::Image> getRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
     bool get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
     void clear_segments();
 

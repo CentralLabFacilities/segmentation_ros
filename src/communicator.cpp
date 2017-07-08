@@ -125,7 +125,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
     LOG4CXX_INFO(logger, "found " << candidates.size() << " objects and " << tables.size() << " planes!\n");
 
     object_tracking_msgs::Classify classify;
-    classify.request.objects = publishRoi(candidates, image);
+    classify.request.objects = getRoi(candidates, image);
 
     // clean old object segments
     clear_segments();
@@ -139,7 +139,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             grasping_msgs::Object object;
 
             object.name = to_string(num_objects);
-            object.support_surface = "plane_0";
+            object.support_surface = "surface0";
             sensor_msgs::PointCloud2 cloud;
             pcl::toROSMsg(*(candidates[i]->getObjectCloud()), cloud);
             object.point_cluster = cloud;
@@ -153,7 +153,16 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             object_tracking_msgs::ObjectLocation object_location;
 
             object_location.name = to_string(num_objects);
-            //object_location.hypothesis = classify.response.hypotheses[i];
+            // get region of interest for the Object.
+            ImageRegion::Ptr item = candidates[i];
+            Roi region = item->getRoiColor();
+            sensor_msgs::RegionOfInterest roi;
+            roi.x_offset = region.X();
+            roi.y_offset = region.Y();
+            roi.width = region.Width();
+            roi.height = region.Height();
+            object_location.bounding_box = roi;
+            object_location.hypotheses = classify.response.hypotheses[i].hypotheses;
 
             res.objects_2d.push_back(object_location);
 
@@ -161,12 +170,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             ++num_objects;
         }
 
-        for (int i = 0; i < tables.size(); i++){
-            grasping_msgs::Object plane;
-            plane.name = "plane_0";
-
-            support_planes.push_back(plane);
-        }
+        calcSupportPlanes(tables);
 
         LOG4CXX_DEBUG(logger, "Results were published.\n");
     } else {
@@ -185,7 +189,7 @@ bool Communicator::get_segments(planning_scene_manager_msgs::Segmentation::Reque
     return true;
 }
 
-vector<sensor_msgs::Image> Communicator::publishRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image){
+vector<sensor_msgs::Image> Communicator::getRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image){
     LOG4CXX_DEBUG(logger, "publish Regions of interest.\n");
     vector<sensor_msgs::Image> rois;
     for (vector<ImageRegion::Ptr>::const_iterator it = candidates.begin(); it != candidates.end(); ++it) {
