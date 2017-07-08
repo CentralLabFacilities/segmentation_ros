@@ -153,7 +153,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             object_tracking_msgs::ObjectLocation object_location;
 
             object_location.name = to_string(num_objects);
-            object_location.hypothesis = classify.response.hypotheses[i];
+            //object_location.hypothesis = classify.response.hypotheses[i];
 
             res.objects_2d.push_back(object_location);
 
