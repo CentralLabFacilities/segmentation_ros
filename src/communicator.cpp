@@ -23,6 +23,8 @@
 #include <iostream>
 #include <iomanip>
 #include <ctime>
+#include <object_tracking_msgs/ObjectShape.h>
+#include <geometry_msgs/Point.h>
 
 using namespace std;
 using namespace log4cxx;
@@ -168,9 +170,9 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             config_names.push_back(planning_scene_manager_msgs::SegmentationResponse::CONFIG_ALL);
 
             // assemble objectlocation for response
-            object_tracking_msgs::ObjectLocation object_location;
+            object_tracking_msgs::ObjectShape object_shape;
 
-            object_location.name = to_string(num_objects);
+            object_shape.name = to_string(num_objects);
             // get region of interest for the Object.
             ImageRegion::Ptr item = candidates[i];
             Roi region = item->getRoiColor();
@@ -179,10 +181,19 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             roi.y_offset = region.Y();
             roi.width = region.Width();
             roi.height = region.Height();
-            object_location.bounding_box = roi;
-            object_location.hypotheses = classify.response.hypotheses[i].hypotheses;
+            object_shape.bounding_box = roi;
+            object_shape.hypotheses = classify.response.hypotheses[i].hypotheses;
+            geometry_msgs::Point center;
+            center.x = item->getRoiCloud().xCenter();
+            center.y = item->getRoiCloud().yCenter();
+            center.z = item->getRoiCloud().zCenter();
 
-            res.objects_2d.push_back(object_location);
+            object_shape.center = center;
+            object_shape.width = item->getWidth();
+            object_shape.height = item->getHeight();
+            object_shape.depth = item->getDepth();
+
+            res.objects.push_back(object_shape);
 
             // increment object name good 'ol clafu style
             ++num_objects;
