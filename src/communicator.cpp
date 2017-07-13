@@ -20,6 +20,9 @@
 #include <geometric_shapes/mesh_operations.h>
 #include <geometric_shapes/shape_messages.h>
 #include <geometric_shapes/shape_operations.h>
+#include <iostream>
+#include <iomanip>
+#include <ctime>
 
 using namespace std;
 using namespace log4cxx;
@@ -33,6 +36,7 @@ Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) 
     recognize_service = node.advertiseService("recognize_objects", &Communicator::recognize, this);
     LOG4CXX_DEBUG(logger, "startet service Server segmentation, recognize_objects\n");
 
+    image_path_pub = node.advertise<std_msgs::String>("image_path", 1000);
 
     classify_client = node.serviceClient<object_tracking_msgs::Classify>("classify");
 
@@ -118,6 +122,20 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
     vector<Surface> tables;
 
     ImageSource::Ptr image(new ImageSource(image_, cloud_));
+    //Save Image and publish path
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+    auto str = oss.str();
+    auto filename = "/home/biron/" + str + ".pgm";
+
+    cv::imwrite(filename,image_);
+    std_msgs::String msg;
+    msg.data = filename;
+    image_path_pub.publish(msg);
+
     seg.setCloud(cloud_);
     seg.setImage(image_);
     seg.segment(image, candidates, tables);

@@ -47,6 +47,7 @@ private:
    ros::ServiceClient classify_client;
    ros::ServiceServer segment_service;
    ros::ServiceServer recognize_service;
+   ros::Publisher image_path_pub;
 
 
    tf::TransformListener tfListener;
