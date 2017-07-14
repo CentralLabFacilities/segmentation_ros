@@ -131,7 +131,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
     std::ostringstream oss;
     oss << std::put_time(&tm, "%d-%m-%Y-%H-%M-%S");
     auto str = oss.str();
-    auto filename = "/home/biron/" + str + ".pgm";
+    auto filename = "/home/biron/" + str + ".jpg";
 
     cv::imwrite(filename,image_);
     std_msgs::String msg;
