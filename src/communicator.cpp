@@ -163,6 +163,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             sensor_msgs::PointCloud2 cloud;
             pcl::toROSMsg(*(candidates[i]->getObjectCloud()), cloud);
             object.point_cluster = cloud;
+            object.header.frame_id = "base_link";
 
             objects.push_back(object);
 
