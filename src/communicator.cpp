@@ -299,7 +299,6 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         primitive.dimensions[0] = xMax - xMin;
         primitive.dimensions[1] = yMax - yMin;
         primitive.dimensions[2] = 0.01;
-        primitive.dimensions[1] = 1.3;
 
         geometry_msgs::Pose poseNew;
         poseNew.position.x = translation[0];
