@@ -31,6 +31,19 @@ using namespace log4cxx;
 
 const LoggerPtr Communicator::logger = Logger::getLogger("segmentation.communicator");
 
+std_msgs::ColorRGBA fromRGB(int r, int g, int b)
+{
+    std_msgs::ColorRGBA color;
+    color.a = 1;
+    color.r = r / 255.0;
+    color.g = g / 255.0;
+    color.b = b / 255.0;
+    return color;
+}
+
+std::vector<std_msgs::ColorRGBA> colors;
+
+
 Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) {
 
 
@@ -39,10 +52,23 @@ Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) 
     LOG4CXX_DEBUG(logger, "startet service Server segmentation, recognize_objects\n");
 
     image_path_pub = node.advertise<std_msgs::String>("image_path", 1000);
+    segmented_cloud_pub = node.advertise<sensor_msgs::PointCloud2>("segmented_object", 10);
+    table_cloud_pub = node.advertise<sensor_msgs::PointCloud2>("segmented_table", 10);
 
     classify_client = node.serviceClient<object_tracking_msgs::Classify>("classify");
 
     LOG4CXX_DEBUG(logger, "created ROS topic " << topic_pub_objects << "\n");
+
+    // Boynton's list of 11 colors
+    colors.push_back(fromRGB(0, 0, 255));      // Blue
+    colors.push_back(fromRGB(255, 0, 0));      // Red
+    colors.push_back(fromRGB(0, 255, 0));      // Green
+    colors.push_back(fromRGB(255, 255, 0));    // Yellow
+    colors.push_back(fromRGB(255, 0, 255));    // Magenta
+    colors.push_back(fromRGB(255, 128, 128));  // Pink
+    colors.push_back(fromRGB(128, 128, 128));  // Gray
+    colors.push_back(fromRGB(128, 0, 0));      // Brown
+    colors.push_back(fromRGB(255, 128, 0));    // Orange
 
     num_objects = 0;
 }
@@ -142,6 +168,10 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
     seg.setImage(image_);
     seg.segment(image, candidates, tables);
 
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr seg_cloud = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tmp = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);
+
+
     LOG4CXX_INFO(logger, "found " << candidates.size() << " objects and " << tables.size() << " planes!\n");
 
     object_tracking_msgs::Classify classify;
@@ -161,7 +191,8 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             object.name = to_string(num_objects);
             object.support_surface = "surface0";
             sensor_msgs::PointCloud2 cloud;
-            pcl::toROSMsg(*(candidates[i]->getObjectCloud()), cloud);
+            tmp = candidates[i]->getObjectCloud();
+            pcl::toROSMsg(*tmp, cloud);
             object.point_cluster = cloud;
             object.header.frame_id = "base_link";
 
@@ -198,9 +229,52 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
 
             // increment object name good 'ol clafu style
             ++num_objects;
+
+
+            for(pcl::PointCloud<pcl::PointXYZRGBA>::iterator it = tmp->begin(); it!= tmp->end(); it++){
+                std_msgs::ColorRGBA c = colors[i % colors.size()];
+                it->r = c.r * 255;
+                it->g = c.g * 255;
+                it->b = c.b * 255;
+            }
+
+            *seg_cloud += *tmp;
+
+
         }
 
         calcSupportPlanes(tables);
+
+        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr table_cloud = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);
+
+        int i = candidates.size();
+
+        for( auto table : tables){
+            tmp->clear();
+
+            pcl::copyPointCloud(*table.cloud, *tmp);
+
+            std_msgs::ColorRGBA c = colors[i++ % colors.size()];
+            
+            for(pcl::PointCloud<pcl::PointXYZRGBA>::iterator it = tmp->begin(); it!= tmp->end(); it++){
+
+                it->r = c.r * 255;
+                it->g = c.g * 255;
+                it->b = c.b * 255;
+            }
+
+            *table_cloud += *tmp;
+        }
+
+        sensor_msgs::PointCloud2 cloud_msg;
+        pcl::toROSMsg(*seg_cloud, cloud_msg);
+        cloud_msg.header.frame_id = "base_link";
+        segmented_cloud_pub.publish(cloud_msg);
+
+        sensor_msgs::PointCloud2 table_msg;
+        pcl::toROSMsg(*table_cloud, table_msg);
+        table_msg.header.frame_id = "base_link";
+        table_cloud_pub.publish(table_msg);
 
         LOG4CXX_DEBUG(logger, "Results were published.\n");
     } else {

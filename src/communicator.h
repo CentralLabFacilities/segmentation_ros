@@ -42,7 +42,9 @@ private:
    ros::Subscriber depth_sub;
    ros::Subscriber rgb_sub;
 
-   ros::Publisher object_pub;
+    ros::Publisher object_pub;
+    ros::Publisher segmented_cloud_pub;
+    ros::Publisher table_cloud_pub;
 
    ros::ServiceClient classify_client;
    ros::ServiceServer segment_service;
