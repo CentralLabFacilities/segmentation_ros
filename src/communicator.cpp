@@ -244,6 +244,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
         }
 
         calcSupportPlanes(tables);
+        res.support_surfaces = support_planes;
 
         pcl::PointCloud<pcl::PointXYZRGBA>::Ptr table_cloud = pcl::PointCloud<pcl::PointXYZRGBA>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBA>);
 
