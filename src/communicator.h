@@ -22,6 +22,7 @@
 #include <planning_scene_manager_msgs/Segmentation.h>
 #include <object_tracking_msgs/Classify.h>
 #include <object_tracking_msgs/RecognizeObjects.h>
+#include <object_tracking_msgs/DetectPlanes.h>
 #include <grasping_msgs/Object.h>
 
 class Communicator {
@@ -34,6 +35,7 @@ public:
     vector<sensor_msgs::Image> getRoi(vector<ImageRegion::Ptr>& candidates, ImageSource::Ptr& image);
     bool get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res);
     void clear_segments();
+    bool detect_planes(object_tracking_msgs::DetectPlanes::Request &req, object_tracking_msgs::DetectPlanes::Response &res);
 
 protected:
    ros::NodeHandle node;
@@ -49,6 +51,7 @@ private:
    ros::ServiceClient classify_client;
    ros::ServiceServer segment_service;
    ros::ServiceServer recognize_service;
+   ros::ServiceServer planes_service;
    ros::Publisher image_path_pub;
 
 

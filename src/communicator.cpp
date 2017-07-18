@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <ctime>
 #include <object_tracking_msgs/ObjectShape.h>
+#include <object_tracking_msgs/DetectPlanes.h>
 #include <geometry_msgs/Point.h>
 
 using namespace std;
@@ -49,6 +50,7 @@ Communicator::Communicator(const Segmentation& segmentation): seg(segmentation) 
 
     segment_service = node.advertiseService("segmentation", &Communicator::get_segments, this);
     recognize_service = node.advertiseService("recognize_objects", &Communicator::recognize, this);
+    planes_service = node.advertiseService("detect_planes", &Communicator::detect_planes, this);
     LOG4CXX_DEBUG(logger, "startet service Server segmentation, recognize_objects\n");
 
     image_path_pub = node.advertise<std_msgs::String>("image_path", 1000);
@@ -285,6 +287,62 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
 
     return true;
 }
+
+
+
+bool Communicator::detect_planes(object_tracking_msgs::DetectPlanes::Request &req, object_tracking_msgs::DetectPlanes::Response &res){
+
+    LOG4CXX_DEBUG(logger, "got planes request.\n");
+    bool d = is_published(topic_d);
+    bool rgb = is_published(topic_rgb);
+    if (!d || !rgb) {
+        LOG4CXX_WARN(logger, "neither " << topic_d << ", nor " << topic_rgb << " are available!\n");
+    }
+
+    got_img = false;
+    got_cloud = false;
+    cout << topic_d << endl;
+    cout << topic_rgb << endl;
+    depth_sub = node.subscribe<sensor_msgs::PointCloud2>(topic_d, 1, &Communicator::depth_cb, this);
+    rgb_sub = node.subscribe<sensor_msgs::Image>(topic_rgb, 1, &Communicator::rgb_cb, this);
+    LOG4CXX_DEBUG(logger, "Subscribed to topics " << topic_d << ", " << topic_rgb);
+    uint timeout = TIMEOUT;
+
+    LOG4CXX_DEBUG(logger, "Waiting for cloud/rgb camera info callbacks...\n");
+    while (true) {
+        ros::spinOnce();
+        ros::Duration(0.5).sleep();
+        if (got_img && got_cloud) {
+            LOG4CXX_DEBUG(logger, "Received cloud & rgb camera info callbacks\n");
+            break;
+        }
+        if (timeout == 0) {
+            LOG4CXX_WARN(logger, "Timeout reached! Was " << TIMEOUT << "\n");
+            timeout = TIMEOUT;
+        }
+        timeout --;
+    }
+
+    vector<ImageRegion::Ptr> candidates;
+    vector<Surface> tables;
+
+    ImageSource::Ptr image(new ImageSource(image_, cloud_));
+    seg.setCloud(cloud_);
+    seg.setImage(image_);
+    seg.segment(image, candidates, tables);
+
+    LOG4CXX_INFO(logger, "found " << tables.size() << " planes!\n");
+
+    calcSupportPlanes(tables);
+    res.support_surfaces = support_planes;
+
+    // clean old object segments
+    clear_segments();
+
+    return true;
+}
+
+
 
 bool Communicator::get_segments(planning_scene_manager_msgs::Segmentation::Request &req, planning_scene_manager_msgs::Segmentation::Response &res) {
     LOG4CXX_INFO(logger, "get_segments.\n");
