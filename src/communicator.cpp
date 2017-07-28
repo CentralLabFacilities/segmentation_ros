@@ -385,8 +385,12 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
     double yBig, xBig, zBig, yMaxB, yMinB;
     yBig = xBig = zBig = yMaxB = yMinB = 0;
 
+    vector<double> plane_heights;
+    int num_planes = 0;
+
     vector<Surface>::const_iterator it;
     for (it = tables.begin(); it != tables.end(); ++it) {
+        num_planes++;
         stringstream ss;
         ss << "surface" << (it - tables.begin());
         string name = ss.str();
@@ -396,9 +400,16 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         xMax = yMax = -numeric_limits<double>::max();
         double xMin, yMin;
         xMin = yMin = numeric_limits<double>::max();
+        double yBig, xBig, zBig;
+        yBig = xBig = zBig = 0;
+
+        grasping_msgs::Object surfaceBig;
+        geometry_msgs::Pose poseBig;
+        shape_msgs::SolidPrimitive primitiveBig;
+
         pcl::PointCloud<pcl::PointXYZ>::Ptr hull = item.cloudHull;
         pcl::PointNormal normal = item.cloudNormal;
-        Eigen::Affine3f pose = item.getPlanePose(Eigen::Vector3f(0,0,1));
+        Eigen::Affine3f pose = item.getPlanePose(Eigen::Vector3f(0, 0, 1));
         Eigen::Vector3f translation = pose.translation();
         Eigen::Vector3f translationInv = translation * -1.0;
         Eigen::Affine3f invTransl;
@@ -407,7 +418,7 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
 
         //gets the z Coordinate to detect the highest and lowest plane
         double zCoord = translation[2];
-        for (int i = 0; i < hull->points.size(); i++){
+        for (int i = 0; i < hull->points.size(); i++) {
             pcl::PointCloud<pcl::PointXYZ>::PointType border = hull->points[i];
             if (xMax < border.x) {
                 xMax = border.x;
@@ -448,9 +459,10 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
         surface.primitive_poses.push_back(poseNew);
         surface.primitives.push_back(primitive);
 
+        plane_heights.push_back(poseNew.position.z);
+        ROS_INFO_STREAM("table" << num_planes << " at " << poseNew.position.z);
         support_planes.push_back(surface);
 
-        /**
         //the important data for the biggest surface is stored.
         if((abs(yMax - yMin)) > yBig){
             yBig = abs(yMax - yMin);
@@ -462,47 +474,53 @@ void Communicator::calcSupportPlanes(vector<Surface>& tables){
             primitiveBig = primitive;
             poseBig = poseNew;
         }
+    }
 
-        zBig = 3.00;
+    if(num_planes > 1){
+        double maxi = 0;
 
-        //primitive is reused and parameters for left plane are used
-        primitiveBig.dimensions[0] =  xBig; //length
-        primitiveBig.dimensions[1] =  0.01; //depth
-        primitiveBig.dimensions[2] =  zBig;//height
+        // get maximum distanceof planes
+        for(int i = 1; i <= num_planes; i++){
+            double fist = abs(plane_heights[i + 1] - plane_heights[i]);
+            if(fist > maxi) maxi = fist;
+        }
 
-        moveit_msgs::CollisionObject surfaceLeft;
-        surfaceLeft.header.frame_id = poseBig.header.frame_id;
-        surfaceLeft.id = "surfaceBigLeft";
-        surfaceLeft.operation = surfaceBig.ADD;
-        surfaceLeft.primitive_poses.push_back(poseBig.pose);
-        surfaceLeft.primitives.push_back(primitiveBig);
-        surfaceLeft.primitive_poses[0].position.x = surfaceBig.primitive_poses[0].position.x;
-        surfaceLeft.primitive_poses[0].position.y = yMinB;
-        surfaceLeft.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
+        if(maxi > 0.25){
+            primitiveBig.dimensions[0] =  xBig; //length
+            primitiveBig.dimensions[1] =  0.01; //depth
+            primitiveBig.dimensions[2] =  zBig;//height
 
-        support_planes.push_back(surfaceLeft);
+            grasping_msgs::Object surfaceLeft;
+            surfaceLeft.header.frame_id = "base_link";
+            surfaceLeft.name = "surfaceBigLeft";
+            surfaceLeft.primitive_poses.push_back(poseBig.pose);
+            surfaceLeft.primitives.push_back(primitiveBig);
+            surfaceLeft.primitive_poses[0].position.x = surfaceBig.primitive_poses[0].position.x;
+            surfaceLeft.primitive_poses[0].position.y = yMinB;
+            surfaceLeft.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
 
-        //Transform of the right plane that is created; for comments look at leftplane
-        primitiveBig.dimensions[0] =  xBig; //length
-        primitiveBig.dimensions[1] =  0.01; //depth
-        primitiveBig.dimensions[2] =  zBig;//height
+            support_planes.push_back(surfaceLeft);
 
-        moveit_msgs::CollisionObject surfaceRight;
-        surfaceRight.header.frame_id = poseBig.header.frame_id;
-        surfaceRight.id = "surfaceBigRight";
-        surfaceRight.operation = surfaceBig.ADD;
-        surfaceRight.primitive_poses.push_back(poseBig.pose);
-        surfaceRight.primitives.push_back(primitiveBig);
-        surfaceRight.primitive_poses[0].position.x = surfaceBig.primitive_poses[0].position.x;
-        surfaceRight.primitive_poses[0].position.y = yMaxB;
-        surfaceRight.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
+            //Transform of the right plane that is created; for comments look at leftplane
+            primitiveBig.dimensions[0] =  xBig; //length
+            primitiveBig.dimensions[1] =  0.01; //depth
+            primitiveBig.dimensions[2] =  zBig;//height
 
-        support_planes.push_back(surfaceRight);
-         */
+            grasping_msgs::Object surfaceRight;
+            surfaceRight.header.frame_id = "base_link";
+            surfaceRight.name = "surfaceBigRight";
+            surfaceRight.primitive_poses.push_back(poseBig.pose);
+            surfaceRight.primitives.push_back(primitiveBig);
+            surfaceRight.primitive_poses[0].position.x = surfaceBig.primitive_poses[0].position.x;
+            surfaceRight.primitive_poses[0].position.y = yMaxB;
+            surfaceRight.primitive_poses[0].position.z = surfaceBig.primitive_poses[0].position.z / 2;
+
+            support_planes.push_back(surfaceRight);
+        }
+
     }
 
 }
-
 
 
 int main(int argc, char **argv)
