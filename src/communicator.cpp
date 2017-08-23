@@ -201,7 +201,7 @@ bool Communicator::recognize(object_tracking_msgs::RecognizeObjects::Request &re
             objects.push_back(object);
 
             // allow all shapes until we add knowledge db
-            config_names.push_back(planning_scene_manager_msgs::SegmentationResponse::CONFIG_ALL);
+            config_names.push_back("default");
 
             // assemble objectlocation for response
             object_tracking_msgs::ObjectShape object_shape;
